@@ -1,0 +1,234 @@
+admin
+santhosh@meoluc
+Meoluc@san
+
+
+<?php
+
+include 'components/connect.php';
+
+if(isset($_SESSION['user_id'])){
+   $user_id = $_SESSION['user_id'];
+}else{
+   $user_id = '';
+};
+
+if(isset($_POST['submit'])){
+
+   $name = $_POST['name'];
+   $name = filter_var($name, FILTER_SANITIZE_STRING);
+   $email = $_POST['email'];
+   $email = filter_var($email, FILTER_SANITIZE_STRING);
+   $pass = sha1($_POST['pass']);
+   $pass = filter_var($pass, FILTER_SANITIZE_STRING);
+   $cpass = sha1($_POST['cpass']);
+   $cpass = filter_var($cpass, FILTER_SANITIZE_STRING);
+   $id=0;
+   $select_user = $conn->prepare("SELECT * FROM `users` WHERE email = ?");
+   $select_user->execute([$email,]);
+   $row = $select_user->fetch(PDO::FETCH_ASSOC);
+   
+   if($select_user->rowCount() > 0){
+      $message[] = 'Entered email is already exists!';
+   }else{
+      if($pass != $cpass){
+         $message[] = "Password's doesn't match!";
+      }else{
+         // $ps='pending';
+         $insert_user = $conn->prepare("INSERT INTO `users`(user_name, email, password) VALUES(?,?,?)");
+         $insert_user->execute([$name, $email, $cpass]);
+         $insert_user1 = $conn->prepare("INSERT INTO `abc`(name,payment_status) VALUES(?,?)");
+         $insert_user1->execute([$name,'pending']);
+         $message[] = 'Registered successfully, login now please!';
+         header('location:user_login.php');
+      }
+   }
+
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <meta http-equiv="X-UA-Compatible" content="IE=edge">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Registration Page</title>
+
+   <link rel="stylesheet" href="https://unpkg.com/swiper@8/swiper-bundle.min.css" />
+   
+   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+
+   <link rel="stylesheet" href="css/user_style.css">
+
+   <link rel="icon" href="ecommerce logo.png">
+
+</head>
+<body>
+   
+<?php include 'components/user_header.php'; ?>
+
+<section class="form-container">
+
+<form action="" method="post">
+<h3>Registration here</h3>
+      <input type="text" name="name" required placeholder="enter your username" maxlength="20"  class="box">
+      <input type="email" name="email" required placeholder="enter your email" maxlength="50"  class="box" oninput="this.value = this.value.replace(/\s/g, '')">
+      <input type="password" name="pass" required placeholder="enter your password" maxlength="20"  class="box" oninput="this.value = this.value.replace(/\s/g, '')">
+      <input type="password" name="cpass" required placeholder="confirm your password" maxlength="20"  class="box" oninput="this.value = this.value.replace(/\s/g, '')">
+      <input type="submit" value="register now" class="btn" name="submit">
+      <p>Already have an account?</p>
+      <a href="user_login.php" class="option-btn">Login here</a>
+
+</form>
+</section>
+
+<!-- 
+<?php 
+include 'components/user_footer.php';
+
+?> -->
+
+<script src="https://unpkg.com/swiper@8/swiper-bundle.min.js"></script>
+
+<script src="js/user_script.js"></script>
+
+
+</body>
+</html><?php
+
+include 'components/connect.php';
+session_start();
+if(isset($_SESSION['user_id'])){
+   $user_id = $_SESSION['user_id'];
+}else{
+   $user_id = '';
+   header('location:home.php');
+   exit();
+}
+
+// Fetch user details
+$select_details = $conn->prepare("SELECT * FROM `users_details` WHERE user_id = ?");
+$select_details->execute([$user_id]);
+$user_details = $select_details->fetch(PDO::FETCH_ASSOC);
+
+$name = $user_details['name'] ?? '';
+$number = $user_details['number'] ?? '';
+$email = $user_details['email'] ?? '';
+$address = $user_details['address'] ?? '';
+
+if(isset($_POST['order'])){
+
+   $number = filter_var($_POST['number'], FILTER_SANITIZE_STRING);
+   $method = filter_var($_POST['method'], FILTER_SANITIZE_STRING);
+   $address = 'Flat no. '. $_POST['flat'] .', '. $_POST['street'] .', '. $_POST['city'] .', '. $_POST['state'] .', '. $_POST['country'] .' - '. $_POST['pin_code'];
+   $address = filter_var($address, FILTER_SANITIZE_STRING);
+   $total_products = $_POST['total_products'];
+   $total_price = $_POST['total_price'];
+
+   $check_cart = $conn->prepare("SELECT * FROM `cart` WHERE user_id = ?");
+   $check_cart->execute([$user_id]);
+
+   if($check_cart->rowCount() > 0){
+
+      $insert_order = $conn->prepare("INSERT INTO `orders`(user_id, name, number, email, method, address, total_products, total_price) VALUES(?,?,?,?,?,?,?,?)");
+      $insert_order->execute([$user_id, $name, $number, $email, $method, $address, $total_products, $total_price]);
+
+      if($user_details){
+         $update_details = $conn->prepare("UPDATE `users_details` SET number = ?, address = ? WHERE user_id = ?");
+         $update_details->execute([$number, $address, $user_id]);
+      }else{
+         $insert_details = $conn->prepare("INSERT INTO `users_details`(user_id, name, number, email, address) VALUES(?,?,?,?,?)");
+         $insert_details->execute([$user_id, $_POST['name'], $number, $_POST['email'], $address]);
+      }
+
+      $delete_cart = $conn->prepare("DELETE FROM `cart` WHERE user_id = ?");
+      $delete_cart->execute([$user_id]);
+
+      $message[] = 'Order placed successfully!';
+   }else{
+      $message[] = 'Your cart is empty';
+   }
+}
+
+include 'components/wishlist_cart.php';
+
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <meta http-equiv="X-UA-Compatible" content="IE=edge">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>Checkout</title>
+
+   <link rel="stylesheet" href="css/user_style.css">
+   <script>
+      function enableEdit(id) {
+         document.getElementById(id).readOnly = false;
+         document.getElementById(id).focus();
+      }
+   </script>
+</head>
+<body>
+   
+<?php include 'components/user_header.php'; ?>
+
+<section class="checkout-orders">
+   <form action="" method="post">
+      <div class="display-orders">
+         <h3>Place your orders</h3>
+
+         <?php
+            $grand_total = 0;
+            $cart_items = [];
+            $select_cart = $conn->prepare("SELECT * FROM `cart` WHERE user_id = ?");
+            $select_cart->execute([$user_id]);
+            if($select_cart->rowCount() > 0){
+               while($fetch_cart = $select_cart->fetch(PDO::FETCH_ASSOC)){
+                  $cart_items[] = $fetch_cart['name'].' ('.$fetch_cart['price'].' x '. $fetch_cart['quantity'].')';
+                  $total_products = implode(', ', $cart_items);
+                  $grand_total += ($fetch_cart['price'] * $fetch_cart['quantity']);
+         ?>
+            <p><?= $fetch_cart['name']; ?> <span>(<?= '₹'.$fetch_cart['price'].'/- x '. $fetch_cart['quantity']; ?>)</span></p>
+         <?php
+               }
+            }else{
+               echo '<p class="empty">Your cart is empty!</p>';
+            }
+         ?>
+
+         <input type="hidden" name="total_products" value="<?= htmlspecialchars($total_products); ?>">
+         <input type="hidden" name="total_price" value="<?= $grand_total; ?>">
+         <div class="grand-total">Grand total: <span>₹<?= $grand_total; ?>/-</span></div>
+      </div>
+
+      <h3>Billing Details</h3>
+
+      <div class="flex">
+         <div class="inputBox">
+            <span>Your number:</span>
+            <input type="number" id="number" name="number" placeholder="Enter your number" value="<?= htmlspecialchars($number); ?>" class="box" min="0" max="9999999999" <?= $number ? 'readonly' : ''; ?> required>
+            <?php if($number): ?>
+               <span class="edit-icon" onclick="enableEdit('number')">✏️</span>
+            <?php endif; ?>
+         </div>
+
+         <div class="inputBox">
+            <span>Your address:</span>
+            <input type="text" id="address" name="address" placeholder="Enter your address" value="<?= htmlspecialchars($address); ?>" class="box" <?= $address ? 'readonly' : ''; ?> required>
+            <?php if($address): ?>
+               <span class="edit-icon" onclick="enableEdit('address')">✏️</span>
+            <?php endif; ?>
+         </div>
+      </div>
+
+      <input type="submit" name="order" class="btn <?= ($grand_total > 0) ? '' : 'disabled'; ?>" value="Place Order">
+   </form>
+</section>
+
+<?php include 'components/user_footer.php'; ?>
+
+</body>
+</html>
